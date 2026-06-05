@@ -1,0 +1,16 @@
+{
+  "name": "servicenow-catalog",
+  "version": "1.0.0",
+  "description": "ServiceNow Catalog Item management via AI Bridge REST API",
+  "main": "index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  }
+}
