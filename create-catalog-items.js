@@ -278,31 +278,30 @@ async function createItem(item) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-async function main() {
-  const json  = JSON.parse(fs.readFileSync(JSON_PATH, 'utf8'));
-  const items = json.items;
-
-  console.log(`\n🚀  Iniciando criação de ${items.length} Catalog Items no ServiceNow...\n`);
-
+// Reaproveitável in-process: cria todos os itens de um JSON e retorna os resultados.
+async function createFromJson(jsonPath) {
+  const json  = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+  const items = json.items || [];
+  console.log(`\n🚀  Criando ${items.length} Catalog Items no ServiceNow...\n`);
   const results = [];
   for (const item of items) {
-    const result = await createItem(item);
-    results.push(result);
+    results.push(await createItem(item));
   }
-
-  console.log('\n╔══════════════════════════════════════════════════════╗');
-  console.log('║  ✅  RESUMO FINAL                                    ║');
-  console.log('╚══════════════════════════════════════════════════════╝');
-  for (const r of results) {
-    console.log(`  📦  ${r.name}`);
-    console.log(`       sys_id : ${r.sys_id}`);
-    console.log(`       tipo   : ${r.type}`);
-  }
-  console.log('\n🎉  Todos os itens criados com sucesso!\n');
+  return results;
 }
 
-main().catch(err => {
-  console.error('\n❌  Erro fatal:', err.message);
-  if (err.stack) console.error(err.stack);
-  process.exit(1);
-});
+module.exports = { createItem, createFromJson };
+
+// CLI: só roda quando executado direto (node create-catalog-items.js),
+// NÃO quando required in-process pelo servicenow-core do alpar-chat.
+if (require.main === module) {
+  createFromJson(JSON_PATH).then(results => {
+    console.log('\n✅  RESUMO FINAL');
+    for (const r of results) console.log(`  📦  ${r.name}  sys_id: ${r.sys_id}  tipo: ${r.type}`);
+    console.log('\n🎉  Todos os itens criados!\n');
+  }).catch(err => {
+    console.error('\n❌  Erro fatal:', err.message);
+    if (err.stack) console.error(err.stack);
+    process.exit(1);
+  });
+}
