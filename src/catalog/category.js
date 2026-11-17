@@ -13,7 +13,7 @@ const TABLE = 'sc_category';
 module.exports = {
   async create({ title, catalogId, description = '', active = true, order = 100, scope } = {}) {
     const data = { title, description, active, order };
-    if (catalogId) data.parent = catalogId;
+    if (catalogId) data.sc_catalog = catalogId;   // catalog field is sc_catalog ('parent' = parent category)
     if (scope) { data.sys_scope = scope; data.sys_package = scope; }
     return api.create(TABLE, data);
   },
@@ -22,7 +22,7 @@ module.exports = {
   // Returns { sys_id, title, _existed: true/false }
   async findOrCreate({ title, catalogId, description = '', active = true, order = 100, scope } = {}) {
     const res = await api.get(TABLE, {
-      sysparm_query: `title=${title}`,
+      sysparm_query: `title=${title}${catalogId ? `^sc_catalog=${catalogId}` : ''}`,
       sysparm_fields: 'sys_id,title,active',
       sysparm_limit: 1,
     });
@@ -33,7 +33,8 @@ module.exports = {
     }
 
     const created = await this.create({ title, catalogId, description, active, order, scope });
-    return { ...created, _existed: false };
+    // POST responses come wrapped one level deeper: { result: { sys_id }, meta }
+    return { ...(created?.result ?? created), _existed: false };
   },
 
   async get(query = '', fields = 'sys_id,title,parent,active,order') {
@@ -46,7 +47,7 @@ module.exports = {
 
   async getByCatalog(catalogId) {
     return api.get(TABLE, {
-      sysparm_query: `parent=${catalogId}`,
+      sysparm_query: `sc_catalog=${catalogId}`,
       sysparm_fields: 'sys_id,title,active,order',
     });
   },

@@ -25,19 +25,20 @@ module.exports = {
       const choice = choices[i];
       const text  = typeof choice === 'string' ? choice : choice.text;
       const value = typeof choice === 'string' ? choice : (choice.value ?? choice.text);
-      const order = (i + 1) * 100;
-      results.push(await this.create({ variableSysId, text, value, order }));
+      const order = (typeof choice === 'object' && Number(choice.order)) || (i + 1) * 100;
+      results.push(await this.create({ variableSysId, text, value, order, inactive: typeof choice === 'object' && choice.inactive ? '1' : '0' }));
     }
     return results;
   },
 
-  async create({ variableSysId, text, value, order = 100 } = {}) {
-    return api.create(TABLE, {
+  async create({ variableSysId, text, value, order = 100, inactive = '0' } = {}) {
+    // mesmo value com textos diferentes é válido no ServiceNow: a chave inclui o text ('^' escapado como '^^' na query)
+    return api.createUnique(TABLE, `question=${variableSysId}^value=${value}^text=${String(text).replaceAll('^', '^^')}`, {
       question: variableSysId,
       text,
       value,
       order,
-      inactive: '0',   // active by default
+      inactive,        // '0' = ativa (padrão); '1' = inativa (vem do export)
     });
   },
 

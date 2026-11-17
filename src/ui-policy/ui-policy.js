@@ -1,6 +1,7 @@
 'use strict';
 
 const api = require('../../utils/api-client');
+const { finder, resolveConditions, renameVars } = require('../../utils/resolve-names');
 
 const TABLE = 'catalog_ui_policy';
 
@@ -74,7 +75,9 @@ module.exports = {
     };
     if (catItemId) data.catalog_item = catItemId;
     if (scope) { data.sys_scope = scope; data.sys_package = scope; }
-    return api.create(TABLE, data);
+    // Idempotent per item: same short_description ("[MDT] - [v_name]") is never created twice
+    const query = catItemId ? `catalog_item=${catItemId}^short_description=${shortDescription}` : null;
+    return query ? api.createUnique(TABLE, query, data) : api.create(TABLE, data);
   },
 
   // Create a per-variable UI Policy for a given layer type
@@ -113,6 +116,68 @@ module.exports = {
       appliesTargetRecord:  layer.appliesTargetRecord,
       scope,
     });
+  },
+
+  // UI Policy do export (AS IS/TO BE), item ou set. As condições chegam com o NOME da variável entre chaves
+  // (IO:{nome}...) porque o sys_id ainda não existia: aqui vira IO:<sys_id>. `vars` = { nome_na_instância: { id, name } }
+  // (nome do export também casa com o prefixo v_/vs_ que os módulos de variável aplicam).
+  // Condição com variável não resolvida → policy pulada; action com variável não resolvida → action pulada.
+  async createFromExport(p, { catItemId, variableSetId, vars, renames, occ = 0, skipActions = false }) {   // occ: 2ª, 3ª… policy com a mesma short_description no mesmo dono
+    const find = finder(vars);
+    const { text: conditions, missing } = resolveConditions(p.conditions, vars);
+    if (missing.length) return { skipped: `variável não encontrada na condição: ${missing.join(', ')}` };
+
+    const data = {
+      short_description:     p.short_description,
+      catalog_conditions:    conditions,
+      active:                p.active,
+      order:                 p.order,
+      on_load:               p.on_load,
+      isolate_script:        p.isolate_script,
+      ui_type:               p.ui_type,
+      va_supported:          p.va_supported,
+      applies_to:            catItemId ? 'item' : 'set',
+      applies_catalog:       p.applies_catalog,
+      applies_req_item:      p.applies_req_item,
+      applies_sc_task:       p.applies_sc_task,
+      applies_target_record: p.applies_target_record,
+      ...p.extra,   // description, global, inherit, reverse_if_false, run_scripts, view (como no export)
+      ...(p.script_true  && { script_true:  renameVars(p.script_true,  renames) }),
+      ...(p.script_false && { script_false: renameVars(p.script_false, renames) }),
+      ...(catItemId ? { catalog_item: catItemId } : { variable_set: variableSetId }),
+    };
+    const owner  = catItemId ? `catalog_item=${catItemId}` : `variable_set=${variableSetId}`;
+    let policy;
+    if (occ > 0) {   // descrição repetida: a n-ésima (por data de criação) é a policy desta ocorrência
+      const rows = await api.get(TABLE, { sysparm_query: `${owner}^short_description=${p.short_description}^ORDERBYsys_created_on`, sysparm_fields: 'sys_id', sysparm_limit: occ + 1 });
+      const list = Array.isArray(rows) ? rows : rows?.result || [];
+      policy = list[occ] ? { result: { sys_id: list[occ].sys_id, _existed: true } } : await api.create(TABLE, data);
+    } else policy = await api.createUnique(TABLE, `${owner}^short_description=${p.short_description}`, data);
+    const sysId  = policy.result.sys_id;
+
+    const warnings = [];
+    let actions = 0;
+    if (skipActions) return { sys_id: sysId, existed: !!policy.result._existed, actions, warnings };
+    for (const a of p.actions) {
+      const v = find(a.variable);
+      if (!v) { warnings.push(`action ${a.variable}: variável não encontrada`); continue; }
+      await api.createUnique('catalog_ui_policy_action', `ui_policy=${sysId}^variable=${v.name}`, {
+        ui_policy:          sysId,
+        catalog_variable:   `IO:${v.id}`,
+        variable:           v.name,
+        visible:            a.visible,
+        mandatory:          a.mandatory,
+        disabled:           a.disabled,
+        cleared:            a.cleared,
+        value:              a.value,
+        value_action:       a.value_action,
+        order:              a.order,
+        field_message_type: 'none',
+        ...(catItemId ? { catalog_item: catItemId } : { variable_set: variableSetId }),
+      });
+      actions++;
+    }
+    return { sys_id: sysId, existed: !!policy.result._existed, actions, warnings, skippedFields: policy.meta?.fields_skipped };
   },
 
   // Build catalog_conditions string for "variable is not empty"

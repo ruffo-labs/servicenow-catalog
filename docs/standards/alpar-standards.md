@@ -78,7 +78,7 @@ Antes de criar uma nova aplicação com escopo:
 | Prefixo do nome | `v_` (ex: `v_model`, `v_requested_for`) |
 | Question text | Sem prefixo — legível para o usuário |
 | Idioma | Inglês |
-| Mandatory / Read Only / Visible | ❌ Nunca definir na variável — sempre via UI Policy |
+| Mandatory / Read Only / Visible | ❌ Nunca definir na variável — sempre via UI Policy. **Exceção temporária:** na importação do export AS IS (`rules: "variable"`, padrão do `create-catalog-items.js` por ora) saem nas propriedades da variável (`mandatory`, `read_only`, `hidden`) e as UI Policies ficam manuais. `--rules ui_policy` restaura o padrão (MDT/VSB/RO + ROS). Os dois cenários coexistem. |
 | Auto-fill com usuário logado | Usar `default_value = "javascript:gs.getUserID()"` — **não** criar Client Script para isso |
 | Placeholder / texto de exemplo | Usar `example_text` — campo correto em `item_option_new` ⚠️ o campo `hint` **não é gravável** via API |
 
@@ -147,6 +147,7 @@ reference: "e03bea02183232108bb255f46a373ab3"  // sys_id — não funciona
 |---|---|
 | Nome do registro | Descritivo e sem prefixo obrigatório (ex: `Hardware Information`) |
 | Variáveis internas | Prefixo `vs_` |
+| Campo `type` do Variable Set | **Somente** `one_to_one` ou `one_to_many` (default `one_to_one`). Nunca `1`, `2` ou outro valor — o ServiceNow rejeita. `variableSet.create` lança erro fora dessas 2 opções |
 
 ### 7.1 Vincular Variable Set existente a um Catalog Item
 
@@ -540,3 +541,26 @@ Este é o schema oficial para envio de um item de catálogo para criação via A
 [ ] [ROS] criado separadamente para todas as variáveis
 [ ] Client Script ui_type sempre "10" (All)
 ```
+
+---
+
+## Importação do export (TO BE / AS IS) — campos usados
+
+`create-catalog-items.js <export.json> --catalog "<nome>" [--rules variable|ui_policy] [--only "Item"] [--update-set "Nome"] [--dry-run] [--update]`
+
+O objeto do export já traz as colunas dos registros; o importador grava o que existe em vez de usar defaults:
+
+| Objeto | Colunas gravadas do export |
+|---|---|
+| Item | `order`, `meta`, `active`, flags NowAssist, `sc_catalogs` (só catálogos que existem; sem nenhum → `--catalog`), e em Record Producer `table_name`, `redirect_url`, scripts |
+| Variable Set | `title`, `internal_name`→`name`, `description`, `type` (`one_to_one`/`one_to_many`), `display_title`, `layout`, `order` |
+| Vínculo `io_set_item` | `order` do link |
+| Variável (item e set) | `order`, `include_none`, `example_text`, `default_value`, `choice_*`, `lookup_*`, `reference`, `reference_qual`, `reference_qual_condition`, `conversational_label`, `not_available_conversation`, `map_to_field`, `active` (+ mandatory/read_only/hidden conforme `--rules`) |
+| Choices | `text`, `value` (vazio → text), `order`, `inactive` |
+| UI Policy / Action | todas as colunas; condições `IO:{nome}` → `IO:<sys_id>` |
+| Service Offering | `sys_id` original (Table API), name, descriptions, parent (Business Service) |
+
+- `--update`: registro que já existe (item, set, variável, choice, policy…) recebe os campos do export; sem a flag ele só é reaproveitado.
+- Colunas que não existem na tabela são ignoradas pelo AI Bridge e listadas no fim da execução.
+- Catalog Client Scripts **são importados** (código em `script.source`, nomes de variável ajustados ao prefixo `v_`/`vs_`).
+- Guia completo, checklist e riscos para ambiente real: [docs/import-guide.md](../import-guide.md).

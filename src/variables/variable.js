@@ -8,7 +8,10 @@ const TABLE = 'item_option_new';
 //  - Name MUST start with "v_" (auto-applied if missing)
 //  - question_text: human-readable label, NO prefix
 //  - Language: English
-//  - mandatory / read_only / visible: NEVER set here — always via UI Policy
+//  - mandatory / read_only / hidden: two scenarios (see docs/standards/alpar-standards.md §6):
+//      · rules "ui_policy" (standard, default): NEVER set here — always via UI Policy
+//      · rules "variable" (current for the AS IS export import): set on the variable itself,
+//        by passing mandatory / readOnly / hidden here; UI Policies are left to manual setup
 //  - reference field: pass TABLE NAME (string), never sys_id
 //  - default_value: use "javascript:gs.getUserID()" for auto-fill (no client script needed)
 //  - example_text: placeholder text shown inside the input field (NOT "hint" — that field is not writable)
@@ -67,7 +70,11 @@ module.exports = {
     referenceQualifier,
     dynamicValueField,        // sys_id of source variable (item_option_new)
     dynamicValueDotWalkPath,  // field to pull from reference (e.g. "email")
+    mandatory,                // rules "variable" only — see header
+    readOnly,
+    hidden,
     scope,
+    extra = {},               // demais colunas do export (choice_*, lookup_*, example_text, include_none, ...) — vencem os defaults
   } = {}) {
     // Enforce v_ prefix
     const prefixedName = name.startsWith('v_') ? name : `v_${name}`;
@@ -92,11 +99,17 @@ module.exports = {
     if (referenceQualifier)      data.reference_qual             = referenceQualifier;
     if (dynamicValueField)       data.dynamic_value_field        = dynamicValueField;
     if (dynamicValueDotWalkPath) data.dynamic_value_dot_walk_path = dynamicValueDotWalkPath;
+    if (mandatory)               data.mandatory                  = true;
+    if (readOnly)                data.read_only                  = true;
+    if (hidden)                  data.hidden                     = true;
+    Object.assign(data, extra);
     if (catItemId)               data.cat_item                   = catItemId;
     if (variableSetId)           data.variable_set               = variableSetId;
     if (scope) { data.sys_scope = scope; data.sys_package = scope; }
 
-    return api.create(TABLE, data);
+    // Idempotent: same variable name in the same item / variable set is never created twice
+    const owner = variableSetId ? `variable_set=${variableSetId}` : (catItemId ? `cat_item=${catItemId}` : '');
+    return api.createUnique(TABLE, `${owner ? owner + '^' : ''}name=${prefixedName}`, data);
   },
 
   async get(query = '', fields = 'sys_id,name,question_text,type,active,order') {

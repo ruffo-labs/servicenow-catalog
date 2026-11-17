@@ -37,7 +37,12 @@ module.exports = {
 
   // Set the Update Set as current for the API user (alpar.ai) via sys_user_preference.
   // This guarantees all records created via AI Bridge go into the correct Update Set.
-  async setCurrent(updateSetSysId) {
+  async setCurrent(updateSetSysId) { return this.setPref('sys_update_set', updateSetSysId); },
+
+  // Aplicação (escopo) atual do usuário da API — seletor de aplicação do ServiceNow
+  async setCurrentApp(scopeSysId) { return this.setPref('apps.current_app', scopeSysId); },
+
+  async setPref(prefName, updateSetSysId) {
     const user = process.env.SERVICENOW_USER;
 
     // 1. Find the sys_id of the API user
@@ -52,7 +57,7 @@ module.exports = {
 
     // 2. Check if the preference already exists
     const prefRes = await api.get('sys_user_preference', {
-      sysparm_query: `user=${userSysId}^name=sys_update_set_current`,
+      sysparm_query: `user=${userSysId}^name=${prefName}`,
       sysparm_fields: 'sys_id,value',
       sysparm_limit: 1,
     });
@@ -65,13 +70,13 @@ module.exports = {
       // Create new preference
       await api.create('sys_user_preference', {
         user: userSysId,
-        name: 'sys_update_set_current',
+        name: prefName,
         value: updateSetSysId,
         type: 'string',
       });
     }
 
-    return { ok: true, updateSetSysId, user };
+    return { ok: true, prefName, value: updateSetSysId, user };
   },
 
   // Helper: list and prompt — use before any creation workflow

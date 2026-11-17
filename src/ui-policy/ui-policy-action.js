@@ -32,7 +32,7 @@ module.exports = {
     disabled = 'ignore',
     order = 100,
   } = {}) {
-    return api.create(TABLE, {
+    return api.createUnique(TABLE, `ui_policy=${uiPolicyId}^variable=${variableName}`, {
       ui_policy:          uiPolicyId,
       catalog_item:       catItemId,
       catalog_variable:   `IO:${variableSysId}`,   // IO: prefix required
