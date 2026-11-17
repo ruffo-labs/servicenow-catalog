@@ -34,9 +34,9 @@ cp .env.example .env
 
 Edite `.env`:
 ```
-SERVICENOW_INSTANCE=https://devXXXXXX.service-now.com
-SERVICENOW_USER=admin
-SERVICENOW_PASSWORD=sua_senha
+SN_INSTANCE_URL=https://devXXXXXX.service-now.com
+SN_USERNAME=admin
+SN_PASSWORD=sua_senha
 ```
 
 ### 3. Instalar dependências

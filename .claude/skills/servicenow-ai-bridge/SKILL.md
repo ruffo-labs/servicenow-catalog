@@ -47,9 +47,9 @@ The adapter uses **GlideRecord internally**, which has none of these limitations
 Before making API calls, ask the user for these credentials:
 
 ```
-SERVICENOW_INSTANCE=https://devXXXXXX.service-now.com
-SERVICENOW_USER=admin
-SERVICENOW_PASSWORD=<password>
+SN_INSTANCE_URL=https://devXXXXXX.service-now.com
+SN_USERNAME=admin
+SN_PASSWORD=<password>
 ```
 
 The adapter base URL is always:

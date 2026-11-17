@@ -43,7 +43,7 @@ module.exports = {
   async setCurrentApp(scopeSysId) { return this.setPref('apps.current_app', scopeSysId); },
 
   async setPref(prefName, updateSetSysId) {
-    const user = process.env.SERVICENOW_USER;
+    const user = process.env.SN_USERNAME;
 
     // 1. Find the sys_id of the API user
     const userRes = await api.get('sys_user', {

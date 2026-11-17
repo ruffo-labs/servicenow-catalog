@@ -2,11 +2,11 @@
 
 require('dotenv').config();
 
-const BASE_URL = `${process.env.SERVICENOW_INSTANCE}/api/1851835/ai_adapter_rest`;
+const BASE_URL = `${process.env.SN_INSTANCE_URL}/api/1851835/ai_adapter_rest`;
 
 function getAuthHeader() {
   const credentials = Buffer.from(
-    `${process.env.SERVICENOW_USER}:${process.env.SERVICENOW_PASSWORD}`
+    `${process.env.SN_USERNAME}:${process.env.SN_PASSWORD}`
   ).toString('base64');
   return `Basic ${credentials}`;
 }
@@ -84,7 +84,7 @@ const api = module.exports = {
   // (ex.: service offerings, referenciados por condições). Idempotente por sys_id.
   async createWithSysId(table, data) {
     if (await this.findId(table, `sys_id=${data.sys_id}`)) return { result: { sys_id: data.sys_id, _existed: true } };
-    const res  = await fetch(`${process.env.SERVICENOW_INSTANCE}/api/now/table/${table}`, {
+    const res  = await fetch(`${process.env.SN_INSTANCE_URL}/api/now/table/${table}`, {
       method: 'POST',
       headers: { Authorization: getAuthHeader(), 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(data),
@@ -106,7 +106,7 @@ const api = module.exports = {
 
 // DELETE via Table API padrão (o AI Bridge não suporta DELETE); usado para trocar vínculos m2m e limpar testes próprios
 module.exports.delete = async (table, sysId) => {
-  const res = await fetch(`${process.env.SERVICENOW_INSTANCE}/api/now/table/${table}/${sysId}`, { method: 'DELETE', headers: { Authorization: getAuthHeader(), Accept: 'application/json' } });
+  const res = await fetch(`${process.env.SN_INSTANCE_URL}/api/now/table/${table}/${sysId}`, { method: 'DELETE', headers: { Authorization: getAuthHeader(), Accept: 'application/json' } });
   if (!res.ok) throw new Error(`[DELETE /api/now/table/${table}] HTTP ${res.status}`);
   return true;
 };
